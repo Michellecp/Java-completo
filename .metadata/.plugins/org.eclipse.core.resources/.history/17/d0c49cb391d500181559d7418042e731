@@ -1,0 +1,10 @@
+package entities;
+
+public class Empregados_list {
+	public int Id;
+	public String name;
+	public double salario;
+	
+	
+
+}

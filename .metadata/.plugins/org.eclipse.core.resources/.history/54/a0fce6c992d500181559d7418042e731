@@ -1,0 +1,54 @@
+package entities;
+
+public class Empregados_list {
+	private int id;
+	private String name;
+	private double salario;
+	
+	public Empregados_list(int id, String name, double salario) {
+		this.id = id;
+		this.name = nome;
+		this.salario = salario;
+	}
+
+	public int getId() {
+		return id;
+	}
+
+	public void setId(int id) {
+		id = id;
+	}
+
+	public String getNome() {
+		return name;
+	}
+
+	public void setNome(String nome) {
+		this.nome = nome;
+	}
+
+	public double getSalario() {
+		return salario;
+	}
+
+	public void setSalario(double salario) {
+		this.salario = salario;
+	}
+	
+	public double incSalario(double){
+		
+	}
+	
+	public String toString(){
+		return "Id: "
+			+ 	id
+			+  ", "
+			+  "Nome: "
+			+  nome
+			+  ", "
+			+  "Salario: "
+			+  String.format("%.2f",totalValeEstoque());
+	}
+
+
+}

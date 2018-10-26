@@ -1,0 +1,28 @@
+package application;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+import entities.Empregados_list;
+
+public class Exerc_Lista {
+
+	public static void main(String[] args) {
+
+		Scanner sc = new Scanner(System.in);
+				
+		System.out.println("Quantos empregados deseja cadastrar?");
+		int num = sc.nextInt();
+		
+		List<String> list = new ArrayList<>()
+		
+		for(int i=1; i<=num; i++){
+			System.out.println("Id: ");
+			emp.id = sc.nextInt();
+			
+		}
+		
+	}
+
+}

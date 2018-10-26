@@ -1,0 +1,14 @@
+package application;
+
+import java.awt.List;
+import java.util.ArrayList;
+
+public class Program5 {
+
+	public static void main(String[] args) {
+		
+		List<String> lista = new ArrayList<>();
+		
+	}
+
+}
