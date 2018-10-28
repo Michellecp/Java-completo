@@ -1,0 +1,44 @@
+package entities;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class OrderItem {
+	
+	private Integer qtda;
+	private Double preco;
+	private List<Product> product = new ArrayList<>();
+	
+	public OrderItem() {
+		
+	}
+
+	public OrderItem(Integer qtda, Double preco) {
+		this.qtda = qtda;
+		this.preco = preco;
+	}
+
+	public Integer getQtda() {
+		return qtda;
+	}
+
+	public void setQtda(Integer qtda) {
+		this.qtda = qtda;
+	}
+
+	public Double getPreco() {
+		return preco;
+	}
+
+	public void setPreco(Double preco) {
+		this.preco = preco;
+	}
+
+	public List<Product> getProduct() {
+		return product;
+	}
+
+	public Double subTotal(){
+		return qtda*preco;
+	}
+}
