@@ -6,7 +6,6 @@
 <fullyQualifiedTypeName name="entities.Triangulo"/>
 <fullyQualifiedTypeName name="java.lang.Math"/>
 <fullyQualifiedTypeName name="entities.Retangulo"/>
-<fullyQualifiedTypeName name="entities.Employee"/>
 <fullyQualifiedTypeName name="entities.Aluno"/>
 <fullyQualifiedTypeName name="java.util.Locale"/>
 <fullyQualifiedTypeName name="entities.CurrencyConvertr"/>
@@ -19,7 +18,6 @@
 <fullyQualifiedTypeName name="java.sql.Date"/>
 <fullyQualifiedTypeName name="java.time.Instant"/>
 <fullyQualifiedTypeName name="java.util.Calendar"/>
-<fullyQualifiedTypeName name="java.util.Scanner"/>
 <fullyQualifiedTypeName name="entities.enums.NivelTrabalho"/>
 <fullyQualifiedTypeName name="entities.departamento"/>
 <fullyQualifiedTypeName name="entities.ContratoHoras"/>
@@ -29,13 +27,22 @@
 <fullyQualifiedTypeName name="entities.Comentarios"/>
 <fullyQualifiedTypeName name="java.text.ParseException"/>
 <fullyQualifiedTypeName name="entities.Produto"/>
-<fullyQualifiedTypeName name="java.util.List"/>
-<fullyQualifiedTypeName name="java.util.ArrayList"/>
-<fullyQualifiedTypeName name="java.text.SimpleDateFormat"/>
-<fullyQualifiedTypeName name="java.util.Date"/>
 <fullyQualifiedTypeName name="entities.Client"/>
 <fullyQualifiedTypeName name="entities.enums.OrderStatus"/>
 <fullyQualifiedTypeName name="entities.Order"/>
-<fullyQualifiedTypeName name="entities.Product"/>
 <fullyQualifiedTypeName name="entities.OrderItem"/>
+<fullyQualifiedTypeName name="entities.BusinessAccount"/>
+<fullyQualifiedTypeName name="entities.SavingsAccount"/>
+<fullyQualifiedTypeName name="entities.Account"/>
+<fullyQualifiedTypeName name="java.util.List"/>
+<fullyQualifiedTypeName name="entities.OutsourcedEmployee"/>
+<fullyQualifiedTypeName name="entities.Employee"/>
+<fullyQualifiedTypeName name="java.lang.Override"/>
+<fullyQualifiedTypeName name="java.util.Scanner"/>
+<fullyQualifiedTypeName name="java.util.ArrayList"/>
+<fullyQualifiedTypeName name="entities.UsedProduct"/>
+<fullyQualifiedTypeName name="java.util.Date"/>
+<fullyQualifiedTypeName name="java.text.SimpleDateFormat"/>
+<fullyQualifiedTypeName name="entities.ImportedProduct"/>
+<fullyQualifiedTypeName name="entities.Product"/>
 </qualifiedTypeNameHistroy>
