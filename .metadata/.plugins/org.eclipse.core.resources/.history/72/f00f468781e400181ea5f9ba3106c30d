@@ -1,0 +1,31 @@
+package entities;
+
+public class Contribuinte {
+
+	private String nome;
+	private Double RendaAtual;
+	
+	public Contribuinte() {
+
+	}
+
+	public String getNome() {
+		return nome;
+	}
+
+	public void setNome(String nome) {
+		this.nome = nome;
+	}
+
+	public Double getRendaAtual() {
+		return RendaAtual;
+	}
+
+	public void setRendaAtual(Double rendaAtual) {
+		RendaAtual = rendaAtual;
+	}
+	
+	
+	
+	
+}

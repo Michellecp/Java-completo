@@ -1,0 +1,30 @@
+package application;
+
+import java.util.Scanner;
+
+public class Exercicio2 {
+
+	public static void main(String[] args) {
+		
+		Scanner sc = new Scanner(System.in);
+		
+		System.out.print("Entre com o numero de pagantes: ");
+		int num = sc.nextInt();
+		
+		for(int i=1; i <= num; i++){
+			System.out.println("Individual ou Companhia?(i/c) ");
+			char opcao = sc.next().charAt(0);
+			
+			if(opcao == 'i'){
+				
+			}
+			
+		}
+		
+		
+		sc.close();
+		
+
+	}
+
+}

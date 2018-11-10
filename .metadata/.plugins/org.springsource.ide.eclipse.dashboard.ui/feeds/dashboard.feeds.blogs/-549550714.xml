@@ -5,7 +5,645 @@
   <link rel="self" href="https://spring.io/blog.atom" />
   <id>http://spring.io/blog.atom</id>
   <icon>https://spring.io/favicon.ico</icon>
-  <updated>2018-11-05T20:26:51Z</updated>
+  <updated>2018-11-08T12:01:00Z</updated>
+  <entry>
+    <title>Spring Boot in a Container</title>
+    <link rel="alternate" href="https://spring.io/blog/2018/11/08/spring-boot-in-a-container" />
+    <category term="engineering" label="Engineering" />
+    <author>
+      <name>Dave Syer</name>
+    </author>
+    <id>tag:spring.io,2018-11-08:3468</id>
+    <updated>2018-11-08T12:01:00Z</updated>
+    <content type="html">&lt;div class="paragraph"&gt;
+&lt;p&gt;Many people are using containers to wrap their Spring Boot applications, and building containers is not a simple thing to do. This is an article for developers of Spring Boot applications, and containers are not always a good abstraction for developers - they force you to learn about and think about very low level concerns - but you will on occasion be called on to create or use a container, so it pays to understand the building blocks. Here we aim to show you some of the choices you can make if you are faced with the prospect of needing to create your own container.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;We will assume that you know how to create and build a basic Spring Boot application. If you don&amp;#8217;t, go to one of the &lt;a href="https://spring.io/guides"&gt;Getting Started Guides&lt;/a&gt;, for example the one on building a &lt;a href="https://spring.io/guides/gs/rest-service/"&gt;REST Service&lt;/a&gt;. Copy the code from there and practise with some of the ideas below. There is also a Getting Started Guide on &lt;a href="https://spring.io/guides/gs/spring-boot-docker"&gt;Docker&lt;/a&gt;, which would also be a good starting point, but it doesn&amp;#8217;t cover the range of choices that we have here, or in as much detail.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="admonitionblock note"&gt;
+&lt;table&gt;
+&lt;tr&gt;
+&lt;td class="icon"&gt;
+&lt;i class="fa icon-note" title="Note"&gt;&lt;/i&gt;
+&lt;/td&gt;
+&lt;td class="content"&gt;
+This blog is also a "topical" guide on the spring.io website. Visit it here for updates: &lt;a href="https://spring.io/guides/topicals/spring-boot-docker/" class="bare"&gt;https://spring.io/guides/topicals/spring-boot-docker/&lt;/a&gt;.
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="a-basic-dockerfile"&gt;&lt;a class="anchor" href="#a-basic-dockerfile"&gt;&lt;/a&gt;A Basic Dockerfile&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;A Spring Boot application is easy to convert into an executable JAR file. All the &lt;a href="https://spring.io/guides"&gt;Getting Started Guides&lt;/a&gt; do this, and every app that you download from &lt;a href="https://start.spring.io"&gt;Spring Initializr&lt;/a&gt; will have a build step to create an executable JAR. With Maven you &lt;code&gt;./mvnw install&lt;/code&gt; and with Gradle you &lt;code&gt;./gradlew build&lt;/code&gt;. A basic Dockerfile to run that JAR would then look like this, at the top level of your project:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;Dockerfile&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+ARG JAR_FILE
+COPY ${JAR_FILE} app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The &lt;code&gt;JAR_FILE&lt;/code&gt; could be passed in as part of the &lt;code&gt;docker&lt;/code&gt; command (it will be different for Maven and Gradle). E.g. for Maven:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ docker build --build-args=target/*.jar -t myorg/myapp .&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;and for Gradle:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ docker build --build-args=build/libs/*.jar -t myorg/myapp .&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Of course, once you have chosen a build system, you don&amp;#8217;t need the &lt;code&gt;ARG&lt;/code&gt; - you can just hard code the jar location. E.g. for Maven:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;Dockerfile&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+COPY target/*.jar app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Then we can simply build an image with&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ docker build -t myorg/myapp .&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;and run it like this:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ docker run -p 8080:8080 myorg/myapp
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::        (v2.0.2.RELEASE)
+
+Nov 06, 2018 2:45:16 PM org.springframework.boot.StartupInfoLogger logStarting
+INFO: Starting Application v0.1.0 on b8469cdc9b87 with PID 1 (/app.jar started by root in /)
+Nov 06, 2018 2:45:16 PM org.springframework.boot.SpringApplication logStartupProfileInfo
+...&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Notice that the base image is &lt;code&gt;openjdk:8-jdk-alpine&lt;/code&gt;. The &lt;code&gt;alpine&lt;/code&gt; images are smaller than the standard &lt;code&gt;openjdk&lt;/code&gt; library images from &lt;a href="https://hub.docker.com/_/openjdk/"&gt;Dockerhub&lt;/a&gt;. There is no official alpine image for Java 11 yet (AdoptOpenJDK had one for a while but it no longer appears on their &lt;a href="https://hub.docker.com/r/adoptopenjdk/openjdk11/"&gt;Dockerhub page&lt;/a&gt;).&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;If you want to poke around inside the image you can open a shell in it like this (the base image does not have &lt;code&gt;bash&lt;/code&gt;):&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ docker run -ti --entrypoint /bin/sh myorg/myapp
+/ # ls
+app.jar  dev      home     media    proc     run      srv      tmp      var
+bin      etc      lib      mnt      root     sbin     sys      usr
+/ #&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The docker configuration is very simple so far, and the generated image is not very efficient. The docker image has a single filesystem layer with the fat jar in it, and every change we make to the application code changes that layer, which might be 10MB or more (even as much as 50MB for some apps). We can improve on that by splitting the JAR up into multiple layers.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="a-better-dockerfile"&gt;&lt;a class="anchor" href="#a-better-dockerfile"&gt;&lt;/a&gt;A Better Dockerfile&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;A Spring Boot fat jar naturally has "layers" because of the way that the jar itself is packaged. If we unpack it first it will already be divided into external and internal dependencies. To do this in one step in the docker build, we need to unpack the jar first. For example (sticking with Maven, but the Gradle version is pretty similar):&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ mkdir target/dependency
+$ (cd target/dependency; tar -zxf ../*.jar)
+$ docker build -t myorg/myapp .&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;with this &lt;code&gt;Dockerfile&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;Dockerfile&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+ARG DEPENDENCY=target/dependency
+COPY ${DEPENDENCY}/BOOT-INF/lib /app/lib
+COPY ${DEPENDENCY}/META-INF /app/META-INF
+COPY ${DEPENDENCY}/BOOT-INF/classes /app
+ENTRYPOINT ["java","-cp","app:app/lib/*","hello.Application"]&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;There are now 3 layers, with all the application resources in the later 2 layers. If the application dependencies don&amp;#8217;t change, then the first layer (from &lt;code&gt;BOOT-INF/lib&lt;/code&gt;) will not change, so the build will be faster, and so will the startup of the container at runtime as long as the base layers are already cached.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="admonitionblock note"&gt;
+&lt;table&gt;
+&lt;tr&gt;
+&lt;td class="icon"&gt;
+&lt;i class="fa icon-note" title="Note"&gt;&lt;/i&gt;
+&lt;/td&gt;
+&lt;td class="content"&gt;
+We used a hard-coded main application class &lt;code&gt;hello.Application&lt;/code&gt;. This will probably be different for your application. You could parameterize it with another &lt;code&gt;ARG&lt;/code&gt; if you wanted. You could also copy the Spring Boot fat &lt;code&gt;JarLauncher&lt;/code&gt; into the image and use it to run the app - it would work and you wouldn&amp;#8217;t need to specify the main class, but it would be a bit slower on startup.
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="tweaks"&gt;&lt;a class="anchor" href="#tweaks"&gt;&lt;/a&gt;Tweaks&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;If you want to start your app as quickly as possible (most people do) there are some tweaks you might consider. Here are some ideas:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="ulist"&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Use the &lt;code&gt;spring-context-indexer&lt;/code&gt; (&lt;a href="https://docs.spring.io/spring/docs/current/spring-framework-reference/core.html#beans-scanning-index"&gt;link to docs&lt;/a&gt;). It&amp;#8217;s not going to add much for small apps, but every little helps.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Don&amp;#8217;t use &lt;a href="https://docs.spring.io/spring-boot/docs/current-SNAPSHOT/reference/htmlsingle/#production-ready"&gt;actuators&lt;/a&gt; if you can afford not to.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Use Spring Boot 2.1 and Spring 5.1.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Fix the location of the
+&lt;a href="https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-external-config-application-property-files"&gt;Spring Boot config file(s)&lt;/a&gt;
+with &lt;code&gt;spring.config.location&lt;/code&gt; (command line argument or System property etc.).&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Switch off JMX - you probably don&amp;#8217;t need it in a container - with &lt;code&gt;spring.jmx.enabled=false&lt;/code&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Run the JVM with &lt;code&gt;-noverify&lt;/code&gt;. Also consider &lt;code&gt;-XX:TieredStopAtLevel=1&lt;/code&gt;
+(that will slow down the JIT later at the expense of the saved startup time).&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Use the container memory hints for Java 8: &lt;code&gt;-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap&lt;/code&gt;. With Java 11 this is automatic by default.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Your app might not need a full CPU at runtime, but it will need multiple CPUs to start up as quickly as possible (at least 2, 4 are better). If you don&amp;#8217;t mind a slower startup you could throttle the CPUs down below 4.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="multi-stage-build"&gt;&lt;a class="anchor" href="#multi-stage-build"&gt;&lt;/a&gt;Multi-Stage Build&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The &lt;code&gt;Dockerfile&lt;/code&gt; above assumed that the fat JAR was already built on the command line. You can also do that step in docker using a multi-stage build, copying the result from one image to another. Example, using Maven:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;Dockerfile&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;FROM openjdk:8-jdk-alpine as build
+WORKDIR /workspace/app
+
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+COPY src src
+
+RUN ./mvnw install -DskipTests
+RUN mkdir -p target/dependency &amp;amp;&amp;amp; (cd target/dependency; jar -xf ../*.jar)
+
+FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+ARG DEPENDENCY=/workspace/app/target/dependency
+COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
+COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
+COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
+ENTRYPOINT ["java","-cp","app:app/lib/*","hello.Application"]&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The first image is labelled "build" and it is used to run Maven and build the fat jar, then unpack it. The unpacking could also be done by Maven or Gradle (this is the approach taken in the Getting Started Guide) - there really isn&amp;#8217;t much difference, except that the build configuration would have to be edited and a plugin added.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Notice that the source code has been split into 4 layers. The later layers contain the build configuration and the source code for the app, and the earlier layers contain the build system itself (the Maven wrapper). This is a small optimization, and it also means that we don&amp;#8217;t have to copy the &lt;code&gt;target&lt;/code&gt; directory to a docker image, even a temporary one used for the build.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Every build where the source code changes will be slow because the Maven cache has to be re-created in the first &lt;code&gt;RUN&lt;/code&gt; section. But you have a completely standalone build that anyone can run to get your application running as long as they have docker. That can be quite useful in some environments, e.g. where you need to share your code with people who don&amp;#8217;t know Java.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="build-plugins"&gt;&lt;a class="anchor" href="#build-plugins"&gt;&lt;/a&gt;Build Plugins&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;If you don&amp;#8217;t want to call &lt;code&gt;docker&lt;/code&gt; directly in your build, there is quite a rich set of plugins for Maven and Gradle that can do that work for you. Here are just a few.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="sect2"&gt;
+&lt;h3 id="spotify-maven-plugin"&gt;&lt;a class="anchor" href="#spotify-maven-plugin"&gt;&lt;/a&gt;Spotify Maven Plugin&lt;/h3&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The &lt;a href="https://github.com/spotify/dockerfile-maven"&gt;Spotify Maven Plugin&lt;/a&gt; is a popular choice. It requires the application developer to write a &lt;code&gt;Dockerfile&lt;/code&gt; and then runs &lt;code&gt;docker&lt;/code&gt; for you, just as if you were doing it on the command line. There are some configuration options for the docker image tag and other stuff, but it keeps the docker knowledge in your application concentrated in a &lt;code&gt;Dockerfile&lt;/code&gt;, which many people like.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;For really basic usage it will work out of the box with no extra configuration:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ mvn com.spotify:dockerfile-maven-plugin:build
+...
+[INFO] Building Docker context /home/dsyer/dev/demo/workspace/myapp
+[INFO]
+[INFO] Image will be built without a name
+[INFO]
+...
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 7.630 s
+[INFO] Finished at: 2018-11-06T16:03:16+00:00
+[INFO] Final Memory: 26M/595M
+[INFO] ------------------------------------------------------------------------&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;That builds an anonymous docker image. We can tag it with &lt;code&gt;docker&lt;/code&gt; on the command line now, or use Maven configuration to set it as the &lt;code&gt;repository&lt;/code&gt;. Example (without changing the &lt;code&gt;pom.xml&lt;/code&gt;):&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ mvn com.spotify:dockerfile-maven-plugin:build -Ddockerfile.repository=myorg/myapp&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Or in the &lt;code&gt;pom.xml&lt;/code&gt;:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;pom.xml&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;&amp;lt;build&amp;gt;
+    &amp;lt;plugins&amp;gt;
+        &amp;lt;plugin&amp;gt;
+            &amp;lt;groupId&amp;gt;com.spotify&amp;lt;/groupId&amp;gt;
+            &amp;lt;artifactId&amp;gt;dockerfile-maven-plugin&amp;lt;/artifactId&amp;gt;
+            &amp;lt;version&amp;gt;1.4.8&amp;lt;/version&amp;gt;
+            &amp;lt;configuration&amp;gt;
+                &amp;lt;repository&amp;gt;myorg/${project.artifactId}&amp;lt;/repository&amp;gt;
+            &amp;lt;/configuration&amp;gt;
+        &amp;lt;/plugin&amp;gt;
+    &amp;lt;/plugins&amp;gt;
+&amp;lt;/build&amp;gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect2"&gt;
+&lt;h3 id="palantir-gradle-plugin"&gt;&lt;a class="anchor" href="#palantir-gradle-plugin"&gt;&lt;/a&gt;Palantir Gradle Plugin&lt;/h3&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The &lt;a href="https://github.com/palantir/gradle-docker"&gt;Palantir Gradle Plugin&lt;/a&gt; works with a &lt;code&gt;Dockerfile&lt;/code&gt; and it also is able to generate a &lt;code&gt;Dockerfile&lt;/code&gt; for you, and then it runs &lt;code&gt;docker&lt;/code&gt; as if you were running it on the command line.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;First you need to import the plugin into your &lt;code&gt;build.gradle&lt;/code&gt;:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;build.gradle&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-groovy" data-lang="groovy"&gt;buildscript {
+    ...
+    dependencies {
+        ...
+        classpath('gradle.plugin.com.palantir.gradle.docker:gradle-docker:0.13.0')
+    }
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;and then finally you apply the plugin and call its task:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;build.gradle&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-groovy" data-lang="groovy"&gt;apply plugin: 'com.palantir.docker'
+
+group = 'myorg'
+
+bootJar {
+    baseName = 'myapp'
+    version =  '0.1.0'
+}
+
+task unpack(type: Copy) {
+    dependsOn bootJar
+    from(zipTree(tasks.bootJar.outputs.files.singleFile))
+    into("build/dependency")
+}
+docker {
+    name "${project.group}/${bootJar.baseName}"
+    copySpec.from(tasks.unpack.outputs).into("dependency")
+    buildArgs(['DEPENDENCY': "dependency"])
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;In this example we have chosen to unpack the Spring Boot fat jar in a specific location in the &lt;code&gt;build&lt;/code&gt; directory, which is the root for the docker build. Then the multi-layer (not multi-stage) &lt;code&gt;Dockerfile&lt;/code&gt; from above will work.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect2"&gt;
+&lt;h3 id="jib-maven-and-gradle-plugins"&gt;&lt;a class="anchor" href="#jib-maven-and-gradle-plugins"&gt;&lt;/a&gt;Jib Maven and Gradle Plugins&lt;/h3&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Google has an open source tool called &lt;a href="https://github.com/GoogleContainerTools/jib"&gt;Jib&lt;/a&gt; that is relatively new, but quite interesting for a number of reasons. Probably the most interesting thing is that you don&amp;#8217;t need docker to run it - it builds the image using the same standard output as you get from &lt;code&gt;docker build&lt;/code&gt; but doesn&amp;#8217;t use &lt;code&gt;docker&lt;/code&gt; unless you ask it to - so it works in environments where docker is not installed (not uncommon in build servers). You also don&amp;#8217;t need a &lt;code&gt;Dockerfile&lt;/code&gt; (it would be ignored anyway), or anything in your &lt;code&gt;pom.xml&lt;/code&gt; to get an image built in Maven (Gradle would require you to at least install the plugin in &lt;code&gt;build.gradle&lt;/code&gt;).&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Another interesting feature of Jib is that it is opinionated about layers, and it optimizes them in a slightly different way than the multi-layer &lt;code&gt;Dockerfile&lt;/code&gt; created above. Just like in the fat jar, Jib separates local application resources from dependencies, but it goes a step further and also puts snapshot dependencies into a separate layer, since they are more likely to change. There are configuration options for customizing the layout further.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Example with Maven (without changing the &lt;code&gt;pom.xml&lt;/code&gt;):&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ mvn com.google.cloud.tools:jib-maven-plugin:build -Dimage=myorg/myapp&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;To run the above command you will need to have permission to push to Dockerhub under the &lt;code&gt;myorg&lt;/code&gt; repository prefix. If you have authenticated with &lt;code&gt;docker&lt;/code&gt; on the command line, that will work from your local &lt;code&gt;~/.docker&lt;/code&gt; configuration. You can also set up a Maven "server" authentication in your &lt;code&gt;~/.m2/settings.xml&lt;/code&gt; (the &lt;code&gt;id&lt;/code&gt; of the repository ios significant):&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;settings.xml&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;    &amp;lt;server&amp;gt;
+      &amp;lt;id&amp;gt;registry.hub.docker.com&amp;lt;/id&amp;gt;
+      &amp;lt;username&amp;gt;myorg&amp;lt;/username&amp;gt;
+      &amp;lt;password&amp;gt;...&amp;lt;/password&amp;gt;
+    &amp;lt;/server&amp;gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;There are other options, e.g. you can build locally against a docker daemon (like running &lt;code&gt;docker&lt;/code&gt; on the command line), using the &lt;code&gt;dockerBuild&lt;/code&gt; goal instead of &lt;code&gt;build&lt;/code&gt;. Other container registries are also supported and for each one you will need to set up local authentication via docker or Maven settings.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The gradle plugin has similar features, once you have it in your &lt;code&gt;build.gradle&lt;/code&gt;, e.g.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;build.gradle&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-groovy" data-lang="groovy"&gt;plugins {
+  ...
+  id 'com.google.cloud.tools.jib' version '0.9.11'
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;or in the older style used in the Getting Started Guides:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;build.gradle&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-groovy" data-lang="groovy"&gt;buildscript {
+    repositories {
+      maven {
+        url "https://plugins.gradle.org/m2/"
+      }
+      mavenCentral()
+    }
+    dependencies {
+        classpath('org.springframework.boot:spring-boot-gradle-plugin:2.0.5.RELEASE')
+        classpath('com.google.cloud.tools.jib:com.google.cloud.tools.jib.gradle.plugin:0.9.11')
+    }
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;and then you can build an image with&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ ./gradlew jib --image=myorg/myapp&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;As with the Maven build, if you have authenticated with &lt;code&gt;docker&lt;/code&gt; on the command line, the image push will authenticate from your local &lt;code&gt;~/.docker&lt;/code&gt; configuration.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="continuous-integration"&gt;&lt;a class="anchor" href="#continuous-integration"&gt;&lt;/a&gt;Continuous Integration&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Automation is part of every application lifecycle these days (or should be). The tools that people use to do the automation tend to be quite good at just invoking the build system from the source code. So if that gets you a docker image, and the environment in the build agents is sufficiently aligned with developer&amp;#8217;s own environment, that might be good enough. Authenticating to the docker registry is likely to be the biggest challenge, but there are features in all the automation tools to help with that.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;However, sometimes it is better to leave container creation completely to an automation layer, in which case the user&amp;#8217;s code might not need to be polluted. Container creation is tricky, and developers sometimes don&amp;#8217;t really care about it. If the user code is cleaner there is more chance that a different tool can "do the right thing", applying security fixes, optimizing caches etc. There are multiple options for automation and they will all come with some features related to containers these days. We are just going to look at a couple.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="sect2"&gt;
+&lt;h3 id="concourse"&gt;&lt;a class="anchor" href="#concourse"&gt;&lt;/a&gt;Concourse&lt;/h3&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;a href="https://concourse-ci.org"&gt;Concourse&lt;/a&gt; is a pipeline-based automation platform that can be used for CI and CD. It is heavily used inside Pivotal and the main authors of the project work there. Everything in Concourse is stateless and everything runs in a container, except the CLI. Since running containers is the main order of business for the automation pipelines, creating containers is well supported. The &lt;a href="https://github.com/concourse/docker-image-resource"&gt;Docker Image Resource&lt;/a&gt; is responsible for keeping the output state of your build up to date, if it is a container image.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Here&amp;#8217;s an example pipeline that builds a docker image for the sample above, assuming it is in github at &lt;code&gt;myorg/myapp&lt;/code&gt; and has a &lt;code&gt;Dockerfile&lt;/code&gt; at the root and a build task declaration in &lt;code&gt;src/main/ci/build.yml&lt;/code&gt;:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;resources:
+- name: myapp
+  type: git
+  source:
+    uri: https://github.com/myorg/myapp.git
+- name: myapp-image
+  type: docker-image
+  source:
+    email: {{docker-hub-email}}
+    username: {{docker-hub-username}}
+    password: {{docker-hub-password}}
+    repository: myorg/myapp
+
+jobs:
+- name: main
+  plan:
+  - task: build
+    file: myapp/src/main/ci/build.yml
+  - put: myapp-image
+    params:
+      build: myapp&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The structure of a pipeline is very declarative: you define "resources" (which are either input or output or both), and "jobs" (which use and apply actions to resources). If any of the input resources changes a new build is triggered. If any of the output resources changes during a job, then it is updated.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The pipeline could be defined in a different place than the application source code. And for a generic build setup the task declarations could be centralized or externalized as well. This allows some separation of concerns between development and automation, if that&amp;#8217;s the way you roll.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect2"&gt;
+&lt;h3 id="jenkins"&gt;&lt;a class="anchor" href="#jenkins"&gt;&lt;/a&gt;Jenkins&lt;/h3&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;a href="https://jenkins.io"&gt;Jenkins&lt;/a&gt; is another popular automation server. It has a huge range of features, but one that is the closest to the other automation samples here is the &lt;a href="https://jenkins.io/doc/book/pipeline/docker/"&gt;pipeline&lt;/a&gt; feature. Here&amp;#8217;s a &lt;code&gt;Jenkinsfile&lt;/code&gt; that builds a Spring Boot project with Maven and then uses a &lt;code&gt;Dockerfile&lt;/code&gt; to build an image and push it to a repository:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;code&gt;Jenkinsfile&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;node {
+    checkout scm
+    sh './mvnw -B -DskipTests clean package'
+    docker.build("myorg/myapp").push()
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;For a (realistic) docker repository that needs authentication in the build server, you can add credentials to the &lt;code&gt;docker&lt;/code&gt; object above using &lt;code&gt;docker.withCredentials(&amp;#8230;&amp;#8203;)&lt;/code&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="buildpacks"&gt;&lt;a class="anchor" href="#buildpacks"&gt;&lt;/a&gt;Buildpacks&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;&lt;a href="https://www.cloudfoundry.org/"&gt;Cloud Foundry&lt;/a&gt; has used containers internally for many years now, and part of the technology used to transform user code into containers is Build Packs, an idea originally borrowed from &lt;a href="https://www.heroku.com/"&gt;Heroku&lt;/a&gt;. The current generation of buildpacks (v2) generates generic binary output that is assembled into a container by the platform. The &lt;a href="https://buildpacks.io/"&gt;new generation of buildpacks&lt;/a&gt; (v3) is a collaboration between Heroku and other companies including Pivotal, and it builds container images directly and explicitly. This is very interesting for developers and operators. Developers don&amp;#8217;t need to care so much about the details of how to build a container, but they can easily create one if they need to. Buildpacks also have lots of features for caching build results and dependencies, so often a buildpack will run much quicker than a native docker build.  Operators can scan the containers to audit their contents and transform them to patch them for security updates. And you can run the buildpacks locally (e.g. on a developer machine, or in a CI service), or in a platform like Cloud Foundry.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The output from a buildpack lifecycle is a container image, but you don&amp;#8217;t need docker or a &lt;code&gt;Dockerfile&lt;/code&gt;, so it&amp;#8217;s CI and automation friendly. The filesystem layers in the output image are controlled by the buildpack, and typically many optimizations will be made without the developer having to know or care about them. There is also an &lt;a href="https://en.wikipedia.org/wiki/Application_binary_interface"&gt;Application Binary Interface&lt;/a&gt; between the lower level layers, like the base image containing the operating system, and the upper layers, containing middleware and language specific dependencies. This makes it possible for a platform, like Cloud Foundry, to patch lower layers if there are security updates without affecting the integrity and functionality of the application.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;To give you an idea of the features of a buildpack here is an example using the &lt;a href="https://github.com/buildpack/pack"&gt;Pack CLI&lt;/a&gt; from the command line (it would work with the sample app we have been using in thus article, no need for a &lt;code&gt;Dockerfile&lt;/code&gt; or any special build configuration):&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="listingblock"&gt;
+&lt;div class="content"&gt;
+&lt;pre class="prettyprint highlight"&gt;&lt;code&gt;$ pack build myorg/myapp --builder=nebhale/java-build --path=.
+2018/11/07 09:54:48 Pulling builder image 'nebhale/java-build' (use --no-pull flag to skip this step)
+2018/11/07 09:54:49 Selected run image 'packs/run' from stack 'io.buildpacks.stacks.bionic'
+2018/11/07 09:54:49 Pulling run image 'packs/run' (use --no-pull flag to skip this step)
+*** DETECTING:
+2018/11/07 09:54:52 Group: Cloud Foundry OpenJDK Buildpack: pass | Cloud Foundry Build System Buildpack: pass | Cloud Foundry JVM Application Buildpack: pass
+*** ANALYZING: Reading information from previous image for possible re-use
+*** BUILDING:
+-----&amp;gt; Cloud Foundry OpenJDK Buildpack 1.0.0-BUILD-SNAPSHOT
+-----&amp;gt; OpenJDK JDK 1.8.192: Reusing cached dependency
+-----&amp;gt; OpenJDK JRE 1.8.192: Reusing cached launch layer
+
+-----&amp;gt; Cloud Foundry Build System Buildpack 1.0.0-BUILD-SNAPSHOT
+-----&amp;gt; Using Maven wrapper
+       Linking Maven Cache to /home/pack/.m2
+-----&amp;gt; Building application
+       Running /workspace/app/mvnw -Dmaven.test.skip=true package
+...
+---&amp;gt; Running in e6c4a94240c2
+---&amp;gt; 4f3a96a4f38c
+---&amp;gt; 4f3a96a4f38c
+Successfully built 4f3a96a4f38c
+Successfully tagged myorg/myapp:latest
+$ docker run -p 8080:8080 myorg/myapp
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::        (v2.0.5.RELEASE)
+
+2018-11-07 09:41:06.390  INFO 1 --- [ main] hello.Application: Starting Application on 1989fb9a00a4 with PID 1 (/workspace/app/BOOT-INF/classes started by pack in /workspace/app)
+...&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;The &lt;code&gt;--builder&lt;/code&gt; is a docker image that runs the buildpack lifecycle - typically it would be a shared resource for all developers, or all developers on a single platform. This one is work in progress from Ben Hale, who maintains the older buildpacks for Cloud Foundry and is now working on the new generation. The output in this case went to the local docker daemon, but in an automation platform it could be a docker registry. Once the &lt;code&gt;pack&lt;/code&gt; CLI reaches a stable release the default builder will probably do the same thing.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="knative"&gt;&lt;a class="anchor" href="#knative"&gt;&lt;/a&gt;Knative&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;Another new project in the container and platform space is &lt;a href="https://cloud.google.com/knative/"&gt;Knative&lt;/a&gt;. Knative is a lot of things, but if you are not familiar with it you can think of it as a building block for building a serverless platform. It is built on &lt;a href="https://kubernetes.io"&gt;Kubernetes&lt;/a&gt; so ultimately it consumes container images, and turns them into applications or "services" on the platform. One of the main features it has, though, is the ability to consume source code and build the container for you, making it more developer and operator friendly. &lt;a href="https://github.com/knative/build"&gt;Knative Build&lt;/a&gt; is the component that does this and is itself a flexible platform for transforming user code into containers - you can do it in pretty much any way you like. Some templates are provided with common patterns like Maven and Gradle builds, and multi-stage docker builds using &lt;a href="https://github.com/GoogleContainerTools/kaniko"&gt;Kaniko&lt;/a&gt;. There is also a template that use &lt;a href="https://github.com/knative/build-templates/tree/master/buildpack"&gt;Buildpacks&lt;/a&gt; which is very interesting for us, since buildpacks have always had good support for Spring Boot. Buildpacks on Knative are also the opinionated choice of &lt;a href="https://projectriff.io"&gt;Riff&lt;/a&gt; and &lt;a href="https://pivotal.io/platform/pivotal-function-service"&gt;Pivotal Function Service&lt;/a&gt; for transforming user functions into running serverless apps.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="sect1"&gt;
+&lt;h2 id="closing"&gt;&lt;a class="anchor" href="#closing"&gt;&lt;/a&gt;Closing&lt;/h2&gt;
+&lt;div class="sectionbody"&gt;
+&lt;div class="paragraph"&gt;
+&lt;p&gt;This article has presented a lot of options for building container images for Spring Boot applications. All of them are completely valid choices, and it is now up to you to decide which one you need. Your first question should be "do I really need to build a container image?" If the answer is "yes" then your choices will likely be driven by efficiency and cacheability, and by separation of concerns. Do you want to insulate developers from needing to know too much about how container images are created? Do you want to make developers responsible for updating images when operating system and middleware vulnerabilities neeed to be patched? Or maybe developers need complete control over the whole process and they have all the tools and knowledge they need.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <title>This Week in Spring - Tuesday, November 6th, 2018</title>
+    <link rel="alternate" href="https://spring.io/blog/2018/11/06/this-week-in-spring-tuesday-november-6th-2018" />
+    <category term="engineering" label="Engineering" />
+    <author>
+      <name>Josh Long</name>
+    </author>
+    <id>tag:spring.io,2018-11-06:3467</id>
+    <updated>2018-11-06T16:35:32Z</updated>
+    <content type="html">&lt;p&gt;Hi Spring fans! Welcome to another installment of &lt;em&gt;This Week in Spring&lt;/em&gt;. I&amp;rsquo;m in Tokyo, Japan, for the epic SpringOne Tour Japan event and then, it&amp;rsquo;s off to Seoul, South Korea and then Singapore. I&amp;rsquo;m trying to keep busy! I delivered two 3+ hour long talks yesterday despite a blistering fever and today I presented at the SpringOne Tour and then, tonight, I had the honor of presenting at a joint meeting of the JJUG and JSUG here in Tokyo on Tuesday evening (starting about 7h ago).&lt;/p&gt;
+&lt;p&gt;If you&amp;rsquo;re about, don&amp;rsquo;t hesitate to say hi! I&amp;rsquo;d love to chat about anything and everything Pivotal and Spring with ya! Anyway, we&amp;rsquo;ve got a &lt;em&gt;ton&lt;/em&gt; to get to, so let&amp;rsquo;s get to it! &lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/11/05/spring-credhub-2-0-0-m1-released"&gt;Spring CredHub 2.0.0.M1 released&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/11/05/spring-cloud-task-2-1-0-m1-is-now-available"&gt;Spring Cloud Task 2.1.0.M1 is now available&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;In which the &lt;a href="https://spring.io/blog/2018/11/01/project-update-spring-cloud-data-flow-for-apache-mesos-and-apache-yarn"&gt;Spring Cloud Data Flow for Apache Mesos and Apache YARN&lt;/a&gt; deployers and Spring Cloud Data Flow implementations are deprecated.&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/11/01/spring-tools-4-0-1-released"&gt;Spring Tools 4.0.1 released&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/10/30/spring-cloud-for-alibaba-0-2-0-released"&gt;Announcing: Spring Cloud Alibaba&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/10/31/reactor-bismuth-sr13-and-californium-sr2-available-now"&gt;Reactor Bismuth-SR13 and Californium-SR2 available now !&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/10/31/spring-security-oauth2-auto-config-2-0-6-2-1-0-released"&gt;Spring Security OAuth2 Auto-config 2.0.6 &amp;amp; 2.1.0 Released&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/10/31/spring-session-bean-ga-released"&gt;Spring Session Bean GA Released&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://spring.io/blog/2018/10/30/spring-cloud-stream-fishtown-rc1-2-1-0-rc1-release-announcement"&gt;Spring Cloud Stream Fishtown.RC1 /2.1.0.RC1 Release Announcement&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;I dig this NewStack interview with &lt;a href="https://twitter.com/cloudfoundry/status/1059808876978233344"&gt;Cloud Foundry CTO Chip Childers&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://m.youtube.com/watch?feature=youtu.be&amp;v=ccxBXDAPdmo"&gt;Check out this look at Spring Data JDBC&lt;/a&gt; from Maciej Walkowiak&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://vaadin.com/blog/microservices-high-availability"&gt;Check out this oldie-but-a-goodie that looks at using Spring Session to replicate session state for Vaadin applications&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Want to see a more production-grade example of &lt;a href="https://twitter.com/bsideup/status/1057365188431757314?s=12"&gt;Spring Fu&amp;rsquo;s &amp;ldquo;Jafu&amp;rdquo; configuration? Check this out!&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Not strictly speaking related to Spring, but if you dig Kotlin as I do, check out this post on concurrency with &lt;a href="https://kotlinexpertise.com/kotlin-coroutines-concurrency/"&gt;Kotlin coroutines&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Nice post on Dzone: &lt;a href="https://dzone.com/articles/spring-boot-2-hibernate-5-jpa-mysql-crud-rest-api"&gt;create a CRUD REST API Using Spring Boot 2, Hibernate 5, JPA, and MySQL&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://twitter.com/cloudfoundry/status/1059574077688553474"&gt;Want to present at the Cloud Foundry North America event?&lt;/a&gt; The CFP is now open!&lt;/li&gt;
+  &lt;li&gt;Another interesting post from the AMIS blog: &lt;a href="https://technology.amis.nl/2018/11/01/running-reactive-spring-boot-on-graalvm-in-docker/"&gt;running Reactive Spring Boot on GraalVM in Docker&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://twitter.com/zackb_at_vizuri/status/1058391407575080960?s=12"&gt;This is an interesting healthcare use case &lt;/a&gt; for Business Rules in a Microservices Architecture based on the FHIR STU 3 data structure, using Spring Boot and JBoss BRMS, among other things.&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://github.com/micrometer-metrics/micrometer/releases/tag/v1.1.0"&gt;Micrometer 1.1.0 is now available! It includes work from 35 contributors and introduces a bunch of new features and monitoring systems.&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Spring Boot engineer/legend &lt;a href="https://twitter.com/madhurabhave23"&gt;Madhura Bhave (@madhurabhave23)&lt;/a&gt; said that the Spring Boot team has added new &lt;a href="https://twitter.com/springcentral/status/1058453728976494592"&gt;issues that are ideal for first-timers.&lt;/a&gt;. She says: &amp;ldquo;If you&amp;rsquo;d like to work on an issue, please comment on the issue to claim it. We&amp;rsquo;re especially interested in contributions from people from groups underrepresented in free and open source software!&amp;rdquo;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://twitter.com/zipkinproject/status/1057076409397432320"&gt;Nice! Netflix uses Spring Cloud Sleuth and Zipkin&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="https://twitter.com/java_hipster/status/1058376188014575616"&gt;JHipster v5.6.0 is released!&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;It&amp;rsquo;s cool that Confluent itself has some nice documentation on &lt;a href="https://www.confluent.io/blog/apache-kafka-spring-boot-application"&gt;how to use Spring Boot with Apache Kafka &lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Check out this &lt;a href="https://www.gremlin.com/chaos-monkey/chaos-monkey-alternatives/spring-boot/"&gt;Chaos Monkey Alternatives for Spring Boot&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Vlad Mihalcea has just announced that &lt;a href="https://github.com/vladmihalcea/flexy-pool"&gt;FlexyPool 2.1.1 has been release, and it now supports Micrometer.io for collecting Metrics.&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;If you celebrate Hallowee, then you might appreciate this epic tweet by Mike Shoemaker: &lt;a href="https://twitter.com/Mike_Shoemaker/status/1057796174541963264"&gt;&amp;ldquo;One of my rockstar software engineers came to work dressed up as his favorite tech. Can you guess what it is, Spring Boot?&amp;rdquo;&lt;/a&gt; :D&lt;/li&gt;
+  &lt;li&gt;Atomist CEO Rod Johnson just announced a new Atomist auto-fix &lt;a href="https://blog.atomist.com/spring-format-autofix/"&gt;to apply the Spring Java Format Maven plugin to any Java project&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;Also, a bit tangential, but I want to extend a warm welcome to my friends at Heptio and congratulate them on their recent VMWare acquisition!&lt;/li&gt;
+&lt;/ul&gt;</content>
+  </entry>
   <entry>
     <title>Spring CredHub 2.0.0.M1 released</title>
     <link rel="alternate" href="https://spring.io/blog/2018/11/05/spring-credhub-2-0-0-m1-released" />
@@ -1129,316 +1767,5 @@ Also see a &lt;a href="https://github.com/spring-projects/spring-integration/wik
 &lt;p&gt;This maintenance release of the 5.1 line includes &lt;a href="https://jira.spring.io/secure/ReleaseNote.jspa?projectId=10000&amp;version=17198"&gt;30 fixes and improvements&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;After its Milestone and RC phase, Spring Boot 2.1.0 GA will be released this week, shipping with this new Spring Framework version!&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://spring.io/projects/spring-framework"&gt;Project Page&lt;/a&gt; | &lt;a href="https://github.com/spring-projects/spring-framework"&gt;GitHub&lt;/a&gt; | &lt;a href="https://jira.spring.io/browse/SPR"&gt;Issues&lt;/a&gt; | &lt;a href="https://docs.spring.io/spring-framework/docs/5.1.2.RELEASE/spring-framework-reference"&gt;Documentation&lt;/a&gt;&lt;/p&gt;</content>
-  </entry>
-  <entry>
-    <title>Spring Session for Apache Geode/Pivotal GemFire 2.0.6.RELEASE and 2.1.0.RELEASE Available!</title>
-    <link rel="alternate" href="https://spring.io/blog/2018/10/26/spring-session-for-apache-geode-pivotal-gemfire-2-0-6-release-and-2-1-0-release-available" />
-    <category term="engineering" label="Engineering" />
-    <author>
-      <name>John Blum</name>
-    </author>
-    <id>tag:spring.io,2018-10-26:3449</id>
-    <updated>2018-10-26T02:52:00Z</updated>
-    <content type="html">&lt;div class="paragraph"&gt;
-&lt;p&gt;Good things come in pairs, so I am happy to announce the availability of &lt;strong&gt;&lt;em&gt;Spring Session for Apache Geode &amp;amp; Pivotal GemFire&lt;/em&gt;&lt;/strong&gt; (SSDG) &lt;code&gt;2.0.6.RELEASE&lt;/code&gt; and &lt;code&gt;2.1.0.RELEASE&lt;/code&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;SSDG &lt;code&gt;2.0.6.RELEASE&lt;/code&gt;, based on Spring Framework &lt;code&gt;5.0.10.RELEASE&lt;/code&gt;, Spring Data &lt;code&gt;Kay-SR11&lt;/code&gt; and Spring Session core &lt;code&gt;2.0.7.RELEASE&lt;/code&gt; mainly contains dependency updates.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;SSDG &lt;code&gt;2.1.0.RELEASE&lt;/code&gt;, on the other hand, has been upgraded to Spring Framework &lt;code&gt;5.1.1.RELEASE&lt;/code&gt;, Spring Data &lt;code&gt;Lovelace-SR1&lt;/code&gt; and Spring Session core &lt;code&gt;2.1.0.RELEASE&lt;/code&gt;, and additionally includes support for custom Session expiration policies and rules.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="custom-session-expiration-configuration"&gt;&lt;a class="anchor" href="#custom-session-expiration-configuration"&gt;&lt;/a&gt;Custom Session Expiration Configuration&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Spring Session for Apache Geode &amp;amp; Pivotal GemFire now provides a new &lt;em&gt;Strategy&lt;/em&gt; interface, &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/api/org/springframework/session/data/gemfire/expiration/SessionExpirationPolicy.html"&gt;&lt;code&gt;SessionExpirationPolicy&lt;/code&gt;&lt;/a&gt; that allows users to customize the rules around exactly how and when the Session should expire.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The interface is roughly defined as:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="title"&gt;SessionExpirationPolicy interface&lt;/div&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-java" data-lang="java"&gt;import java.time.Duration;
-
-@FunctionalInterface
-interface SessionExpirationPolicy {
-
-  Optional&amp;lt;Duration&amp;gt; determineExpirationTimeout(Session session);
-
-  default ExpirationAction getExpirationAction() {
-    return ExpirationAction.INVALIDATE;
-  }
-}&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;A user only need implement the &lt;code&gt;determineExpirationTimeout&lt;/code&gt; method, which returns an &lt;code&gt;Optional&lt;/code&gt; &lt;code&gt;java.time.Duration&lt;/code&gt; indicating the length of time until the Session will expire.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;&lt;code&gt;Duration&lt;/code&gt; is optional so that, in certain cases, if the expiration timeout cannot be determined for a particular Session by your custom policy, then returning &lt;code&gt;Optional.empty()&lt;/code&gt; will indicate to either Apache Geode or Pivotal GemFire that the default, entry idle timeout expiration policy configured for the Region managing your application Session state should apply.  The default idle timeout is 30 minutes, which you can change by setting the &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/api/org/springframework/session/data/gemfire/config/annotation/web/http/EnableGemFireHttpSession.html#maxInactiveIntervalInSeconds--"&gt;maxInactiveIntervalInSeconds&lt;/a&gt; attribute of the &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/api/org/springframework/session/data/gemfire/config/annotation/web/http/EnableGemFireHttpSession.html"&gt;@EnableGemFireHttpSession&lt;/a&gt; annotation.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="admonitionblock tip"&gt;
-&lt;table&gt;
-&lt;tr&gt;
-&lt;td class="icon"&gt;
-&lt;div class="title"&gt;Tip&lt;/div&gt;
-&lt;/td&gt;
-&lt;td class="content"&gt;
-Alternatively, you can set the &lt;code&gt;spring.session.data.gemfire.session.expiration.max-inactive-interval-seconds&lt;/code&gt; property in Spring Boot&amp;#8217;s &lt;code&gt;application.properties&lt;/code&gt;, or declare bean of type &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/api/org/springframework/session/data/gemfire/config/annotation/web/http/support/SpringSessionGemFireConfigurer.html"&gt;SpringSessionGemFireConfigurer&lt;/a&gt; in the Spring container and override the &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/api/org/springframework/session/data/gemfire/config/annotation/web/http/support/SpringSessionGemFireConfigurer.html#getMaxInactiveIntervalInSeconds--"&gt;getMaxInactiveIntervalInSeconds()&lt;/a&gt; method.
-&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/table&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Then, you simply declare your custom &lt;code&gt;SessionExpirationPolicy&lt;/code&gt; instance as a bean in the Spring container and then make sure Spring Session for Apache Geode or Pivotal GemFire knows about it by setting the &lt;code&gt;sessionExpirationPolicyBeanName&lt;/code&gt; attribute of the &lt;code&gt;@EnableGemFireHttpSession&lt;/code&gt; annotation, like so:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-java" data-lang="java"&gt;@SpringBootApplication
-@EnableGemFireHttpSession(
-  sessionExpirationPolicyBeanName = "customExpirationPolicy"
-)
-class MySpringSessionApplication {
-
-  @Bean
-  SessionExpirationPolicy customExpirationPolicy(..) {
-    return new CustomExpirationPolicy(..);
-  }
-
-  ...
-}&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Because the &lt;code&gt;SessionExpirationPolicy&lt;/code&gt; instance is a bean just like any other managed bean in the Spring container, you can configure it, however you like, injecting references to other beans and so on.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="admonitionblock tip"&gt;
-&lt;table&gt;
-&lt;tr&gt;
-&lt;td class="icon"&gt;
-&lt;div class="title"&gt;Tip&lt;/div&gt;
-&lt;/td&gt;
-&lt;td class="content"&gt;
-Again, the bean name of the custom &lt;code&gt;SessionExpirationPolicy&lt;/code&gt; can be set in Spring Boot &lt;code&gt;application.properties&lt;/code&gt; using &lt;code&gt;spring.session.data.gemfire.session.expiration.bean-name&lt;/code&gt; or by declaring an instance of &lt;code&gt;SprinSessionGemFireConfigurer&lt;/code&gt; in the Spring container and overriding the &lt;code&gt;getSessionExpirationPolicyBeanName()&lt;/code&gt; method.
-&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/table&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;More details can be found in the &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/reference/html5/#httpsession-gemfire-expiration"&gt;docs&lt;/a&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="fixed-duration-expiration"&gt;&lt;a class="anchor" href="#fixed-duration-expiration"&gt;&lt;/a&gt;Fixed Duration Expiration&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;In addition to allowing custom Session expiration policies and rules, out-of-the-box, Spring Session for Apache Geode &amp;amp; Pivotal GemFire provides an implementation of this interface to support fixed duration expiration timeouts.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;This is useful in situations where the Session should timeout, no matter what, after a fixed duration of time, perhaps 1 hour, only if the Session has not already idled out.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;This request actually came up in core Spring Session &lt;a href="https://github.com/spring-projects/spring-session/issues/922"&gt;Issue #922&lt;/a&gt; - "&lt;em&gt;Absolute session timeouts&lt;/em&gt;" awhile back.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;While this capability is not possible in all store providers for Spring Session, it is possible with Apache Geode or Pivotal GemFire.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Simple enable the following:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre class="prettyprint highlight"&gt;&lt;code class="language-java" data-lang="java"&gt;import org.springframework.session.data.gemfire.expiration.support.FixedTimeoutSessionExpirationPolicy;
-
-@SpringBootApplication
-@EnableGemFireHttpSession(
-  sessionExpirationPolicyBeanName = "fixedTimeoutExpirationPolicy"
-)
-class MySpringSessionApplication {
-
-  @Bean
-  SessionExpirationPolicy fixedDurationExpirationPolicy() {
-    return new FixedTimeoutSessionExpirationPolicyt(Duration.ofMinutes(60L));
-  }
-
-  ...
-}&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Of course, Spring Session for Apache Geode &amp;amp; Pivotal GemFire is careful to respect the idle timeout of the Session was well.  As such, the Session will expire whenever the idle timeout or the fixed timeout has elapsed, which ever happens first.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Again, more details can be found in the &lt;a href="https://docs.spring.io/autorepo/docs/spring-session-data-geode-build/2.1.0.RELEASE/reference/html5/#httpsession-gemfire-expiration-fixed-timeout-configuration"&gt;docs&lt;/a&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="conclusion"&gt;&lt;a class="anchor" href="#conclusion"&gt;&lt;/a&gt;Conclusion&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;As always, feedback is very much appreciated.  Until next time, happy coding!&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;&lt;a href="https://github.com/spring-projects/spring-session-data-geode"&gt;Project Page&lt;/a&gt; | &lt;a href="https://github.com/spring-projects/spring-session-data-geode/issues"&gt;Issues&lt;/a&gt; | &lt;a href="https://github.com/spring-projects/spring-session-data-geode/pulls"&gt;PR&lt;/a&gt; | &lt;a href="https://stackoverflow.com/questions/tagged/spring-session"&gt;StackOverflow&lt;/a&gt;&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;</content>
-  </entry>
-  <entry>
-    <title>Spring Cloud Data Flow 1.7 GA Released</title>
-    <link rel="alternate" href="https://spring.io/blog/2018/10/25/spring-cloud-data-flow-1-7-ga-released" />
-    <category term="releases" label="Releases" />
-    <author>
-      <name>Mark Pollack</name>
-    </author>
-    <id>tag:spring.io,2018-10-25:3448</id>
-    <updated>2018-10-25T18:32:00Z</updated>
-    <content type="html">&lt;div class="paragraph"&gt;
-&lt;p&gt;The &lt;a href="https://cloud.spring.io/spring-cloud-dataflow/"&gt;Spring Cloud Data Flow&lt;/a&gt; team is pleased to announce the release of &lt;code&gt;1.7.0&lt;/code&gt;. Follow the &lt;em&gt;Getting Started&lt;/em&gt; guides for &lt;a href="https://docs.spring.io/spring-cloud-dataflow/docs/1.7.0.RELEASE/reference/htmlsingle/#getting-started"&gt;Local Server&lt;/a&gt;, &lt;a href="https://docs.spring.io/spring-cloud-dataflow-server-cloudfoundry/docs/1.7.0.RELEASE/reference/htmlsingle/#getting-started"&gt;Cloud Foundry&lt;/a&gt;, and &lt;a href="https://docs.spring.io/spring-cloud-dataflow-server-kubernetes/docs/1.7.0.RELEASE/reference/htmlsingle/#kubernetes-getting-started"&gt;Kubernetes&lt;/a&gt;.  Look for an updated &lt;a href="https://docs.pivotal.io/scdf"&gt;Cloud Foundry Tile for SCDF&lt;/a&gt; release in the coming weeks.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="here-are-the-highlights"&gt;&lt;a class="anchor" href="#here-are-the-highlights"&gt;&lt;/a&gt;Here are the highlights&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="ulist"&gt;
-&lt;ul&gt;
-&lt;li&gt;
-&lt;p&gt;Improved UI&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Stream Application DSL&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Audit trail&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Concurrent Task Launch Limiting&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Stream and Task validation&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Force upgrade for Streams&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Task Scheduling on Kubernetes&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="improved-ui"&gt;&lt;a class="anchor" href="#improved-ui"&gt;&lt;/a&gt;Improved UI&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The UI has a completely new look.  The navigation has moved from tabs to a left side navigation system.  This gives increased screen real estate for creating streams with the Flo designer and even more screen real estate can be obtained by minimizing the left side navigation.  There is a quick search feature that searches across all the different Data Flow categories.  Additional colors and overall theme changes have been added to make the UI look more lively.  Deeper in the core, the route management has been improved and we have increased our end to end testing coverage using BrowserStack/SauceLabs.  The property whitelisting functionality has been refined to not display all application properties by default if the whitelist is empty.  Check out the video for a UI walkthough.&lt;/p&gt;
-&lt;/div&gt;
-&lt;iframe width="560" height="315" src="https://www.youtube.com/embed/rvAr0KYXBhk?rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen&gt;&lt;/iframe&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="stream-application-dsl"&gt;&lt;a class="anchor" href="#stream-application-dsl"&gt;&lt;/a&gt;Stream Application DSL&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Not all use cases can be solved by having a linear pipeline with data flowing from source to processor to sink with a single destination connecting each application.  Some use cases require a collection of applications that have multiple input and outputs. This topology is supported in Spring Cloud Stream by using user defined binding interfaces but was not supported in Data Flow.  It is also common to have multiple inputs and outputs in Kafka Streams applications.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;In addition, not all use cases are solved using Spring Cloud Stream applications. A http gateway application that sends a synchronous request/reply message to a Kafka or RabbitMQ application can be written using only Spring Integration.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;In these cases, Data Flow can&amp;#8217;t make assumptions about the flow of data from one application to another and therefore can&amp;#8217;t set the application&amp;#8217;s destination properties as is done when using the &lt;a href="http://docs.spring.io/spring-cloud-dataflow/docs/1.7.0.RELEASE/reference/htmlsingle/#spring-cloud-dataflow-stream-intro-dsl"&gt;Stream Pipeline DSL&lt;/a&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;To address these use cases we have introduced the &lt;a href="http://docs.spring.io/spring-cloud-dataflow/docs/1.7.0.RELEASE/reference/htmlsingle/#spring-cloud-dataflow-stream-app-dsl"&gt;Stream Application DSL&lt;/a&gt;.  This DSL uses a &lt;code&gt;comma&lt;/code&gt;, instead of the &lt;code&gt;pipe symbol&lt;/code&gt;, to indicate that Data Flow should not configure the binding properties of the application.  Instead, the developer needs to set the appropriate deployment properties to 'wire up' the application.  An example of the DSL using the domain of the &lt;a href="https://github.com/spring-projects/spring-integration-samples/tree/master/applications/cafe"&gt;EIP Cafe example&lt;/a&gt;, is&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre&gt;dataflow:&amp;gt; stream create --definition "orderGeneratorApp, baristaApp, hotDrinkApp, coldDrinkApp" --name myCafeStream&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Where the listed applications in the DSL need to be registered as &lt;code&gt;--type app&lt;/code&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;In this stream, the &lt;code&gt;baristaApp&lt;/code&gt; has two output destinations intended to be consumed by the &lt;code&gt;hotDrinkApp&lt;/code&gt; and &lt;code&gt;coldDrinkApp&lt;/code&gt; respectively.  When deploying the stream, set the destination properties such that destinations match up for the desired flow of data, for example:&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="listingblock"&gt;
-&lt;div class="content"&gt;
-&lt;pre&gt;app.baristaApp.spring.cloud.stream.bindings.hotDrinks.destination=hotDrinksDest
-app.baristaApp.spring.cloud.stream.bindings.coldDrinks.destination=coldDrinksDest
-app.hotDrinkApp.spring.cloud.stream.bindings.input.destination=hotDrinksDest
-app.coldDrinkApp.spring.cloud.stream.bindings.input.destination=coldDrinksDest&lt;/pre&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Here is a video showcasing this functionality.&lt;/p&gt;
-&lt;/div&gt;
-&lt;iframe width="560" height="315" src="https://www.youtube.com/embed/g4A5Qatfln4?rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen&gt;&lt;/iframe&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="audit-trail"&gt;&lt;a class="anchor" href="#audit-trail"&gt;&lt;/a&gt;Audit Trail&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;To help answer the question "Who did what and when?" an audit trail has been introduced to store the actions taken involving schedules, streams and tasks.  For apps and schedules the create and deletion actions are audited.  For streams, the creation, deletion, deployment, undeployment, update and rollback are audited.  For tasks, the creation, launching and destory are audited.  The audit information is available in the UI to query.  Accessing audit information in the shell is forthcoming.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="imageblock"&gt;
-&lt;div class="content"&gt;
-&lt;img src="https://raw.githubusercontent.com/spring-cloud/spring-cloud-dataflow/master/spring-cloud-dataflow-docs/src/main/asciidoc/images/dataflow-dashboard-audit.png" alt="Audit Dashboard"&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="concurrent-task-launch-limiting"&gt;&lt;a class="anchor" href="#concurrent-task-launch-limiting"&gt;&lt;/a&gt;Concurrent Task Launch Limiting&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Spring Cloud Data Flow allows you to enforce a maximum number of concurrently running tasks to prevent the saturation of compute resources. This limit can be configured by setting the &lt;code&gt;spring.cloud.dataflow.task.maximum-concurrent-tasks&lt;/code&gt; property. The default value is 20.  You can also retrieve the current number of concurrently executing tasks though the REST endpoint &lt;code&gt;/tasks/executions/current&lt;/code&gt;.  A new &lt;a href="https://github.com/spring-cloud-stream-app-starters/tasklauncher-data-flow"&gt;tasklauncher-dataflow&lt;/a&gt; application makes use of this feature to only launch tasks if the number of concurrent tasks is below the maximum.  The feature is also at the center of a new FTP ingest sample application that is under development.  A sneak peak is available in the &lt;a href="https://www.youtube.com/watch?v=n6fS-KmN0zI"&gt;Cloud-native patterns for Data-intensive applications&lt;/a&gt; webinar&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="stream-and-task-validation"&gt;&lt;a class="anchor" href="#stream-and-task-validation"&gt;&lt;/a&gt;Stream and Task validation&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The new shell commands &lt;code&gt;stream validate&lt;/code&gt; and &lt;code&gt;task validate&lt;/code&gt; will validate that the stream or task application resources are valid and accessable.  This avoids getting exceptions at deployment time.  Validation using the UI is forthcoming.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="force-upgrade-for-streams"&gt;&lt;a class="anchor" href="#force-upgrade-for-streams"&gt;&lt;/a&gt;Force upgrade for Streams&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;&lt;a href="https://www.youtube.com/watch?v=Sbg9k8SGppQ"&gt;Use the force!&lt;/a&gt;  When upgrading a stream, you can now use the option &lt;code&gt;--force&lt;/code&gt; to deploy new instances of currently deployed applications even if no applicaton or deployment properties have changed.  This behavior is needed in the case when configuration information is obtained by the application itself at startup time, for example from Spring Cloud Config Server. You can specify which applications to force upgrade by using the option &lt;code&gt;--app-names&lt;/code&gt;. If you do not specify any application names, all the applications will be force upgraded. You can specify &lt;code&gt;--force&lt;/code&gt; and &lt;code&gt;--app-names&lt;/code&gt; options together with &lt;code&gt;--properties&lt;/code&gt; or &lt;code&gt;--propertiesFile&lt;/code&gt; options.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="task-scheduling-on-kubernetes"&gt;&lt;a class="anchor" href="#task-scheduling-on-kubernetes"&gt;&lt;/a&gt;Task Scheduling on Kubernetes&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;Task Scheduling was introduced in Data Flow 1.6 for Cloud Foundry.  This release adds scheduling support for &lt;a href="http://docs.spring.io/spring-cloud-dataflow-server-kubernetes/docs/1.7.0.RELEASE/reference/htmlsingle/#_scheduling"&gt;scheduling of tasks on Kubernetes&lt;/a&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="what-is-next"&gt;&lt;a class="anchor" href="#what-is-next"&gt;&lt;/a&gt;What is next&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;The 1.7 release will be the last minor release in the 1.x series.  We will be moving onto development of 2.0 which will remove the 'classic' mode and upgrade to a Boot 2.1 based stack.  Other features are planned as well, so stay tuned.  In the meantime, expect some blog posts discussing using SCDF for FTP file ingest, interopability with Python, and application composition based on Spring Cloud Function.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;div class="sect1"&gt;
-&lt;h2 id="stay-in-touch"&gt;&lt;a class="anchor" href="#stay-in-touch"&gt;&lt;/a&gt;Stay in touch&amp;#8230;&amp;#8203;&lt;/h2&gt;
-&lt;div class="sectionbody"&gt;
-&lt;div class="paragraph"&gt;
-&lt;p&gt;As always, we welcome feedback and contributions, so please reach out to us on &lt;a href="https://stackoverflow.com/questions/tagged/spring-cloud-dataflow"&gt;Stackoverflow&lt;/a&gt; or &lt;a href="https://github.com/spring-cloud/spring-cloud-dataflow/issues"&gt;GitHub&lt;/a&gt; or via &lt;a href="https://gitter.im/spring-cloud/spring-cloud-dataflow"&gt;Gitter&lt;/a&gt;.&lt;/p&gt;
-&lt;/div&gt;
-&lt;/div&gt;
-&lt;/div&gt;</content>
   </entry>
 </feed>
