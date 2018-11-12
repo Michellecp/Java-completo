@@ -1,0 +1,63 @@
+package model.entities;
+
+import model.exceptions.DomainException;
+
+public class Account{
+	
+	private Integer numero;
+	private String titular;
+	private Double saldo;
+	private Double saqueLim;
+	
+	public Account(Integer numero, String titular, Double saldo, Double saqueLim) {
+		this.numero = numero;
+		this.titular = titular;
+		this.saldo = saldo;
+		this.saqueLim = saqueLim;
+	}
+
+	public Integer getNumero() {
+		return numero;
+	}
+
+	public void setNumero(Integer numero) {
+		this.numero = numero;
+	}
+
+	public String getTitular() {
+		return titular;
+	}
+
+	public void setTitular(String titular) {
+		this.titular = titular;
+	}
+
+	public Double getSaldo() {
+		return saldo;
+	}
+
+	public void setSaldo(Double saldo) {
+		this.saldo = saldo;
+	}
+
+	public Double getSaqueLim() {
+		return saqueLim;
+	}
+
+	public void deposit(double amount){
+		saldo+=amount;
+	}
+	
+	public void saque(double amount) throws DomainException {
+		if (amount > saqueLim) {
+			throw new DomainException("The amount exceeds withdraw limit");
+		}
+		if (amount > saldo) {
+			throw new DomainException("Not enough balance");
+		}
+		saldo -= amount;
+	}
+
+}
+	
+	
